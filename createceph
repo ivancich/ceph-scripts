@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ~/bin/locatecephbuild
+. $(dirname $0)/locatecephbuild
 
 build_dir=`locate_build`
 
