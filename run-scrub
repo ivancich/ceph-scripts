@@ -1,0 +1,92 @@
+#!/bin/sh
+
+wait_health_ok () {
+    start=$(date +%s)
+
+    # wait for health OK
+    while true ; do
+        if bin/ceph -s 2>/dev/null | grep -q HEALTH_OK ; then
+	    break
+	fi
+	sleep 1
+    done
+
+    # wait for all pgs to be out of creating
+    while true ; do
+        if bin/ceph status 2>/dev/null | egrep -q "^ *[0-9]+ creating$" ; then
+	    :
+	else
+            break
+        fi
+	sleep 1
+    done
+
+    # wait for all pgs to be just active+clean
+    while true ; do
+        if bin/ceph pg ls clean 2>/dev/null | grep -q "active+clean[^ ]" ; then
+	    :
+	else
+            break
+        fi
+	sleep 1
+    done
+
+    # wait for health OK
+    while true ; do
+        if bin/ceph -s 2>/dev/null | grep -q HEALTH_OK ; then
+	    break
+	fi
+	sleep 1
+    done
+
+    stop=$(date +%s)
+    bin/ceph -s
+    time=$(expr $stop - $start)
+
+    echo waited for $time seconds for HEALTH to achieve OK
+
+    if [ $time -le 300 ] ; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+stopceph
+
+scrub-expt --prep
+
+wait_health_ok
+
+stopceph
+
+sleep 5
+
+while true ; do
+    startceph
+    wait_health_ok
+    if [ $? -eq 1 ] ; then
+        break
+    fi
+    stopceph
+done
+
+# set to true to cause delay giving time to attach gdb to, for
+# example, a ceph-osd process
+if false ; then
+    echo "TEMPORARY Running experiment in 60 seconds..."
+    bell 5
+    sleep 30
+    echo "TEMPORARY Running experiment in 30 seconds..."
+    bell 5
+    sleep 20
+    echo "TEMPORARY Running experiment in 10 seconds..."
+    bell 5
+    sleep 5
+    echo "TEMPORARY Running experiment in 5 seconds..."
+    bell 5
+    sleep 5
+fi
+
+scrub-expt --deepscrub -c=500
+# scrub-expt --deepscrub -c=1500

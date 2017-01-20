@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ $# -ne 1 ] ; then
+   echo "Usage: $0 key"
+   exit 1
+fi
+
+key=$1
+
+for f in out/osd*log ; do
+    osd=$(echo $f | sed 's/.*osd\.\(.*\)\.log/\1/')
+    grep throttle_data $f | \
+    	 sed 's/.*throttle_data \(.*\): (\(.*\))$/\1 \2/' | \
+    	 sed 's/,/ /g' | \
+	 sed "s/\(.*\)/${osd} \1/"
+done > throttle-${key}.data

@@ -1,0 +1,75 @@
+#!/bin/bash
+
+if [ $# -lt 1 ] ;then
+   echo Usage: $0 osd-stdout-file...
+   exit 1
+fi
+
+percent() {
+  num=$1
+  denom=$2
+  if [ $denom -eq 0 ] ;then
+    echo "0%"
+  else
+    echo "$(expr 100 \* $num / $denom)%"
+  fi
+}
+
+while [ $# -gt 0 ] ; do
+  file=$1
+  shift
+  temp=/tmp/$(basename $file).$$
+  
+  re='.* w:([^ ]+).*wgt:([^ ]+)'
+  # [ IN client:{ ClientInfo:: r:0.000000 w:0.001000 l:0.000000 1/r:0.000000 1/w:1000.000000 1/l:0.000000 } res:MAX wgt:83368882.1061 lim:MIN ]
+
+  osd_re='.*/(osd\.[0-9]*)'
+
+  filter1="w:0.00[01][01][01]"
+  filter2="."
+  filter=$filter1
+
+  grep $filter $file |
+    while read line ; do
+      if [[ $line =~ $re ]] ;then
+        if [ ${BASH_REMATCH[1]} = 0.001000 ] ;then
+          op=client
+        elif [ ${BASH_REMATCH[1]} = 0.000100 ] ;then
+          op=recovery
+        elif [ ${BASH_REMATCH[1]} = 0.000010 ] ;then
+          op=recovery
+        else
+          op=unknown
+        fi
+      fi
+      echo ${BASH_REMATCH[2]} $op
+    done |
+    uniq -c >$temp
+  
+  all1=$(grep "^ *1" $temp | wc -l)
+  all1=$(expr $all1 / 2)
+  all2=$(grep "^ *2" $temp | wc -l)
+  alltotal=$(expr $all1 + $all2)
+
+  client1=$(grep "^ *1.*client" $temp | wc -l)
+  client1=$(expr $client1 / 2)
+  client2=$(grep "^ *2.*client" $temp | wc -l)
+  clienttotal=$(expr $client1 + $client2)
+
+  recov1=$(grep "^ *1.*recovery" $temp | wc -l)
+  recov1=$(expr $recov1 / 2)
+  recov2=$(grep "^ *2.*recovery" $temp | wc -l)
+  recovtotal=$(expr $recov1 + $recov2)
+
+  if [[ $file =~ $osd_re ]] ;then
+    osd=${BASH_REMATCH[1]}
+  else
+    osd="osd"
+  fi
+
+  echo "${osd}: client+recovery: delayed = ${all1} ($(percent $all1 $alltotal)) ; immediate = ${all2} ($(percent $all2 $alltotal))"
+  echo "       client: delayed = ${client1} ($(percent $client1 $clienttotal)) ; immediate = ${client2} ($(percent $client2 $clienttotal))"
+  echo "       recovery: delayed = ${recov1} ($(percent $recov1 $recovtotal)) ; immediate ${recov2} ($(percent $recov2 $recovtotal))"
+
+  rm -f $temp
+done

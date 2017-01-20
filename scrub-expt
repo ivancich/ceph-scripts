@@ -1,0 +1,223 @@
+#!/bin/bash
+
+concurrent=4
+scrub_time=30
+addl_bench_time=90
+final_time=30
+client_time=0 # will be sum of all other times
+block_size=524288
+obj_size_factor=1
+obj_size=$(expr $block_size \* $obj_size_factor)
+parallel=1
+
+. ~/bin/locatecephbuild
+build_dir=`locate_build`
+
+for i in "$@" ;do
+    case $i in
+	--time=*)
+	    client_time="${i#*=}"
+	    shift
+	    ;;
+	-c=*|--concurrent=*)
+	    concurrent="${i#*=}"
+	    shift
+	    ;;
+#	--objs=*|--objects=*)
+#	    num_objects="${i#*=}"
+#	    shift
+#	    ;;
+#	--kill)
+#	    mode=kill
+#	    shift # past argument=value
+#	    ;;
+#	--keep)
+#	    mode=keep
+#	    shift # past argument=value
+#	    ;;
+#	--restart)
+#	    mode=restart
+#	    shift # past argument=value
+#	    ;;
+	--prep)
+	    mode=prep
+	    shift # past argument=value
+	    ;;
+	--scrub)
+	    mode=scrub
+	    shift # past argument=value
+	    ;;
+	--deepscrub)
+	    mode=deepscrub
+	    shift # past argument=value
+	    ;;
+	--help)
+	    echo OUT OF DATE
+	    echo $0 [mode] [limit] [options]
+	    echo "    mode is one of --prep, --keep, --kill, or --restart"
+	    echo "    limit is one of:"
+	    echo "        --time=<seconds>"
+	    echo "        --ops=<number-operations>"
+    echo "    options are:"
+	    echo "        --concurrent=<concurrent-operations>"
+	    echo "        --objs=<number-objects>"
+	    exit 0
+	    ;;
+	*)
+	    echo "Unknown argument $i"
+	    error=1
+	    ;;
+    esac
+done
+
+
+scrub_pgs() {
+    pool=$1
+    start=$2
+    stop=$3
+    type=$4
+    if [ -z "$type" ] ; then
+        type="scrub"
+    fi
+    cursor=$start
+    while [ $cursor -lt $stop ] ; do
+	cursor_hex=$(echo "obase=16; $cursor" | bc)
+	pg="${pool}.${cursor_hex}"
+	echo "initiating $type of pg $pg"
+	bin/ceph pg $type $pg
+	cursor=$(expr $cursor + 1)
+    done
+}
+
+if [ "$error" = "1" ] ;then
+    echo Error: command-line options.
+    exit 1
+fi
+
+if [ -z "$mode" ] ;then
+    echo Error: must specify --prep, --scrub, or --deepscrub
+    exit 1
+fi
+
+. ~/bin/locatecephbuild
+build_dir=`locate_build`
+
+cd ${build_dir}
+pool=scrub-expt
+prefix=scrub-expt
+
+conf=${build_dir}/ceph.conf
+
+if grep -q "^[^;]*osd[ _]*objectstore.*bluestore" $conf ;then
+    echo detected bluestore
+    store="--bluestore"
+else
+    echo detected filestore
+    store=""
+fi
+
+if [ "$mode" = "prep" ] ; then
+# start ceph
+    ../src/stop.sh
+
+set -x
+    ../src/vstart.sh --osd_num 5 --mon_num 3 --mds_num 0 -d -k -l --short $store 2>/dev/null
+set +x
+
+    for o in 0 1 2 3 4 ; do
+	bin/ceph osd in $o
+    done
+
+    # delete pool
+    bin/ceph osd pool delete $pool $pool --yes-i-really-really-mean-it
+
+    # create pool named data
+    bin/ceph osd pool create $pool 150
+
+    exit 0
+fi
+
+# find unique suffix based on date/time
+stamp=$(date "+%m%d%H%M")
+set -o noclobber
+for s in a b c d e f g h i j k l m n o p q r s t u v w x y z ;do
+    id="${stamp}${s}"
+    info="${mode}-info-${id}.txt"
+    { > $info ; } &> /dev/null
+    if [ $? -eq 0 ] ;then break ;fi
+done
+set +o noclobber
+
+run_name="ei-${mode}-run"
+out_summary="${mode}-summary-${id}.txt"
+oplog="${mode}-oplog-${id}.log"
+
+if [ "$mode" = "scrub" -o "$mode" = "deepscrub" ] ;then
+    client_time=$(expr $client_time + $scrub_time)
+    if [ "$mode" = "scrub" ] ;then
+        echo Scrubbing after $scrub_time seconds
+        # ( sleep $scrub_time ; bin/ceph osd scrub 3 ; echo "initiated scrub of osd 3" ) &
+        ( sleep $scrub_time ; scrub_pgs 1 0 50 ; echo "initiated scrub of pgs 0 through 49" ) &
+    else
+        echo Deep scrubbing after $scrub_time seconds
+        #( sleep $scrub_time ; bin/ceph osd deepscrub 3 ; echo "initiated deepscrub of osd 3" ) &
+        ( sleep $scrub_time ; scrub_pgs 1 0 50 deep-scrub ; echo "initiated deep scrub of pgs 0 through 49" ) &
+    fi
+fi
+
+client_time=$(expr $client_time + $addl_bench_time)
+echo Running rados bench for $client_time seconds
+
+start=`date`
+
+# test
+count=0
+while [ $count -lt $parallel ] ;do
+set -x
+bin/rados -b $block_size -o $obj_size -p $pool bench $client_time write -t $concurrent --no-cleanup --run-name ${run_name}.$count >${out_summary}.$count &
+set +x
+count=$(expr $count + 1)
+done
+
+sleep $client_time
+
+echo "rados client now finished $(date); waiting additional $final_time seconds"
+
+sleep $final_time
+
+echo "finishing up $(date)"
+
+stop=`date`
+
+ps x | grep osd
+
+# echo WOULD HAVE STOPPED NOW
+stopceph
+
+grep -h OPWATCH out/osd.*.log | sort > $oplog
+
+# record some information in a .txt file
+
+echo "concurrent = ${concurrent}" >>$info
+echo "parallel = ${parallel}" >>$info
+echo "mode = ${mode}" >>$info
+echo "scrub_time = $scrub_time" >>$info
+echo "addl_bench_time = $addl_bench_time" >>$info
+echo "final_time = $final_time" >>$info
+
+# run-time
+echo "$start" >>$info
+echo "$stop" >>$info
+
+# git branch/commit
+git branch --no-color 2>/dev/null |
+    sed -e '/^[^*]/d' -e 's/* \(.*\)/branch: \1/' >>$info
+echo "commit: $(git rev-parse HEAD)" >>$info
+
+# config
+echo "==== ceph.conf start ====" >>$info
+cat ceph.conf >>$info
+echo "==== ceph.conf end ====" >>$info
+
+# memory
+free >>$info

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. ~/bin/locatecephbuild
+
+build_dir=`locate_build`
+
+cd ${build_dir}
+../src/stop.sh

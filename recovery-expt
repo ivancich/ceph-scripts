@@ -1,0 +1,195 @@
+#!/bin/bash
+
+concurrent=4
+kill_time=30
+restart_time=90
+addl_bench_time=90
+final_time=120
+client_time=0 # will be sum of all other times
+block_size=524288
+obj_size_factor=1
+obj_size=$(expr $block_size \* $obj_size_factor)
+parallel=1
+
+for i in "$@" ;do
+    case $i in
+	--time=*)
+	    client_time="${i#*=}"
+	    shift
+	    ;;
+	-c=*|--concurrent=*)
+	    concurrent="${i#*=}"
+	    shift
+	    ;;
+#	--objs=*|--objects=*)
+#	    num_objects="${i#*=}"
+#	    shift
+#	    ;;
+	--kill)
+	    mode=kill
+	    shift # past argument=value
+	    ;;
+	--keep)
+	    mode=keep
+	    shift # past argument=value
+	    ;;
+	--restart)
+	    mode=restart
+	    shift # past argument=value
+	    ;;
+	--prep)
+	    mode=prep
+	    shift # past argument=value
+	    ;;
+	--help)
+	    echo $0 [mode] [limit] [options]
+	    echo "    mode is one of --prep, --keep, --kill, or --restart"
+	    echo "    limit is one of:"
+	    echo "        --time=<seconds>"
+	    echo "        --ops=<number-operations>"
+    echo "    options are:"
+	    echo "        --concurrent=<concurrent-operations>"
+	    echo "        --objs=<number-objects>"
+	    exit 0
+	    ;;
+	*)
+	    echo "Unknown argument $i"
+	    error=1
+	    ;;
+    esac
+done
+
+if [ "$error" = "1" ] ;then
+    echo Error: command-line options.
+    exit 1
+fi
+
+if [ -z "$mode" ] ;then
+    echo Error: must specify --prep, --mode, --keep or --restart.
+    exit 1
+fi
+
+cd /home/ivancich/ceph-work/build
+pool=radosbench
+prefix=radosbench
+
+conf=~/ceph-work/build/ceph.conf
+
+if grep -q "^[^;]*osd[ _]*objectstore.*bluestore" $conf ;then
+    echo detected bluestore
+    store="--bluestore"
+else
+    echo detected filestore
+    store=""
+fi
+
+if [ "$mode" = "prep" ] ; then
+# start ceph
+    ../src/stop.sh
+
+set -x
+    ../src/vstart.sh --osd_num 5 --mon_num 3 --mds_num 0 -d -k -l --short $store 2>/dev/null
+set +x
+
+    for o in 0 1 2 3 4 ; do
+	bin/ceph osd in $o
+    done
+
+    # delete pool
+    bin/ceph osd pool delete $pool $pool --yes-i-really-really-mean-it
+
+    # create pool named data
+    bin/ceph osd pool create $pool 150
+
+    exit 0
+fi
+
+# find unique suffix based on date/time
+stamp=$(date "+%m%d%H%M")
+set -o noclobber
+for s in a b c d e f g h i j k l m n o p q r s t u v w x y z ;do
+    id="${stamp}${s}"
+    info="radosbench-info-${id}.txt"
+    { > $info ; } &> /dev/null
+    if [ $? -eq 0 ] ;then break ;fi
+done
+set +o noclobber
+
+run_name="ei-rb-run"
+out_summary=radosbench-summary-${id}.txt
+oplog=radosbench-oplog-${id}.log
+
+if [ "$mode" = "kill" -o "$mode" = "restart" ] ;then
+    client_time=$(expr $client_time + $kill_time)
+    echo Killing osd 3 after $kill_time seconds
+    # ( sleep $kill_time ; kill -9 $(cat out/osd.3.pid) ; echo "killed osd 3" ) &
+    ( sleep $kill_time ; bin/ceph osd out 3 ; echo "killed osd 3" ) &
+fi
+
+if [ "$mode" = "restart" ] ;then
+    client_time=$(expr $client_time + $restart_time)
+    echo Restarting osd 3 after $restart_time seconds
+    # ( sleep $restart_time ; /home/ivancich/ceph-work/build/bin/ceph-osd -i 3 -c /home/ivancich/ceph-work/build/ceph.conf ; echo "restarted osd 3" ) &
+    ( sleep $restart_time ; bin/ceph osd in 3 ; echo "restarted osd 3" ) &
+fi
+
+client_time=$(expr $client_time + $addl_bench_time)
+echo Running rados bench for $client_time seconds
+
+start=`date`
+
+# test
+count=0
+while [ $count -lt $parallel ] ;do
+set -x
+bin/rados -b $block_size -o $obj_size -p $pool bench $client_time write -t $concurrent --no-cleanup --run-name ${run_name}.$count >${out_summary}.$count &
+set +x
+count=$(expr $count + 1)
+done
+
+sleep $client_time
+
+echo "rados client now finished $(date); waiting additional $final_time seconds"
+
+sleep $final_time
+
+echo "finishing up $(date)"
+
+stop=`date`
+
+# make sure osd 3 is in for next round
+bin/ceph osd in 3
+
+ps x | grep osd
+
+# echo WOULD HAVE STOPPED NOW
+stopceph
+
+grep -h OPWATCH out/osd.*.log | sort > $oplog
+
+# record some information in a .txt file
+
+echo "concurrent = ${concurrent}" >>$info
+echo "parallel = ${parallel}" >>$info
+echo "mode = ${mode}" >>$info
+echo "kill_time = $kill_time" >>$info
+echo "restart_time = $restart_time" >>$info
+echo "addl_bench_time = $addl_bench_time" >>$info
+echo "final_time = $final_time" >>$info
+
+# run-time
+echo "$start" >>$info
+echo "$stop" >>$info
+
+# git branch/commit
+git branch --no-color 2>/dev/null |
+    sed -e '/^[^*]/d' -e 's/* \(.*\)/branch: \1/' >>$info
+echo "commit: $(git rev-parse HEAD)" >>$info
+
+# config
+echo "==== ceph.conf start ====" >>$info
+cat ceph.conf >>$info
+echo "==== ceph.conf end ====" >>$info
+
+# memory
+free >>$info

@@ -1,0 +1,79 @@
+#!/bin/sh
+
+wait_health_ok () {
+    start=$(date +%s)
+
+    # wait for health OK
+    while true ; do
+        if bin/ceph -s 2>/dev/null | grep -q HEALTH_OK ; then
+	    break
+	fi
+	sleep 1
+    done
+
+    # wait for all pgs to be out of creating
+    while true ; do
+        if bin/ceph status 2>/dev/null | egrep -q "^ *[0-9]+ creating$" ; then
+	    :
+	else
+            break
+        fi
+	sleep 1
+    done
+
+    # wait for all pgs to be just active+clean
+    while true ; do
+        if bin/ceph pg ls clean 2>/dev/null | grep -q "active+clean[^ ]" ; then
+	    :
+	else
+            break
+        fi
+	sleep 1
+    done
+
+    # wait for health OK
+    while true ; do
+        if bin/ceph -s 2>/dev/null | grep -q HEALTH_OK ; then
+	    break
+	fi
+	sleep 1
+    done
+
+    stop=$(date +%s)
+    bin/ceph -s
+    time=$(expr $stop - $start)
+
+    echo waited for $time seconds for HEALTH to achieve OK
+
+    if [ $time -le 300 ] ; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+stopceph
+
+recovery-expt --prep
+
+wait_health_ok
+
+stopceph
+
+sleep 5
+
+while true ; do
+    startceph
+    wait_health_ok
+    if [ $? -eq 1 ] ; then
+        break
+    fi
+    stopceph
+done
+
+recovery-expt --kill -c=500
+
+
+#        replay_count=$(bin/ceph pg ls replay 2>/dev/null | wc -l)
+#        stale_count=$(bin/ceph pg ls stale 2>/dev/null | wc -l)
+#	echo "****" all $all_count clean $clean_count replay $replay_count stale $stale_count

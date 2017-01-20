@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# if [ $# -ne 2 ] ;then
+#     echo "Usage: $0 datafile filter"
+#     echo "    where filter is ops, bytes, wal_ops, or wal_bytes"
+#     exit 1
+# fi
+
+if [ $# -ne 1 ] ;then
+    echo "Usage: $0 datafile"
+    exit 1
+fi
+
+datafile=$1
+# filter=$2
+tempfile=/tmp/plot.$$
+
+if hash shuf 2>/dev/null; then
+    shuf $datafile > $tempfile
+elif hash gshuf 2>/dev/null; then
+    gshuf $datafile > $tempfile
+else
+    cp $datafile $tempfile
+fi
+
+count=0
+
+makeplot() {
+    count=$(expr $count + 1)
+    filt=$1
+    col=$2
+    xlabel=$3
+    tempdata=/tmp/plot.data.$$.${count}
+    grep " ${filt} " $tempfile > $tempdata
+cat <<EOF | tee /tmp/foobar | gnuplot -p
+    set title "$datafile"
+    set xlabel "$xlabel"
+    set ylabel "latency in nanoseconds"
+    set zlabel "OSD #"
+    set cbrange [0:4]
+    set palette defined ( 0 "#8080FF", 1 "#80FF80", 2 "#FFFF40", 3 "#FFC040", 4 "#FF8080" )
+    # plot "$datafile" using 3:(stringcolumn(2) eq "${filter}" && column(1) == 0?column(5):1/0) lt 2
+    # plot "$datafile" using 3:(stringcolumn(2) eq "${filter}"?column(5):1/0):2
+    # plot "$tempfile" using ${col}:(stringcolumn(2) eq '${filt}' ? column(5):1/0):1 notitle with points lc palette z
+    plot "$tempdata" using ${col}:5:1 notitle with points lc palette z
+EOF
+}
+
+
+# makeplot wal_ops 4 "# transaction elements on queue"
+makeplot wal_ops 4 "# transaction elements on queue"
+# makeplot wal_bytes 4 "# transaction bytes on queue"
+# makeplot wal_ops 3 "# transaction contexts queue"
+# makeplot wal_ops 4 "# transaction elements on queue"
+# makeplot wal_ops "(floor(column(6) * 10000) % 10000)" "arrival into queue"
+makeplot wal_ops "(floor(column(6) * 1000) % 1000)" "ms into sec arrival into queue"

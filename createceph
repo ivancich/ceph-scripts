@@ -1,0 +1,24 @@
+#!/bin/sh
+
+. ~/bin/locatecephbuild
+
+build_dir=`locate_build`
+
+conf=${build_dir}/ceph.conf
+
+if grep -q "^[^;]*osd[ _]*objectstore.*bluestore" $conf ;then
+    echo detected bluestore
+    store="--bluestore"
+else
+    echo detected filestore
+    store=""
+fi
+
+cd ${build_dir}
+rm -rf dev/*
+set -x
+../src/vstart.sh --osd_num 5 --mon_num 3 --mds_num 0 -d -l -k --short -n $store
+set +x
+for o in 0 1 2 3 4 ; do
+    bin/ceph osd in $o
+done

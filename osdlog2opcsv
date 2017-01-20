@@ -1,0 +1,188 @@
+#!/usr/bin/env python
+
+import sys
+#import json
+#import tempfile
+import datetime
+
+def extract_start(json):
+    try:
+        # Also convert to int since update_time will be string.  When comparing
+        # strings, "10" is smaller than "2".
+        return float(json['start'])
+    except KeyError:
+        return 0.0
+
+class TypeTracker:
+    'Tracks a type of data'
+
+    def __init__(self, name):
+        self.reset()
+        self.name = name
+
+    def __str__(self):
+        return "tracker_" + self.name
+
+    def add(self, data):
+        self.count += 1
+        self.sum += data
+        if data < self.min:
+            self.min = data
+        if data > self.max:
+            self.max = data
+
+    def reset(self):
+        self.count = 0
+        self.sum = 0
+        self.min = float('inf')
+        self.max = 0
+
+    def get_min(self):
+        if self.count > 0:
+            return self.min
+        else:
+            return 0
+
+    def mean(self):
+        if self.count > 0:
+            return self.sum / self.count
+        else:
+            return 0
+
+
+if len(sys.argv) < 2:
+    print >> sys.stderr, 'expecting at least one argument for file to process'
+    sys.exit(1)
+
+ops = { 42: 'OSD_OP',
+        76: 'SUBOP',
+        77: 'SUBOPREPLY',
+        93: 'REP_SCRUB',
+        94: 'PG_SCAN',
+        95: 'PG_BACKFILL',
+        105: 'PG_PUSH',
+        106: 'PG_PULL',
+        107: 'PG_PUSH_REPLY',
+        112: 'REPOP',
+        113: 'REPOP_REPLY',
+        114: 'PG_UPDATE_LOG_MISSING',
+        115: 'PG_UPDATE_LOG_MISSING_REPLY' }
+key_ops = ops.keys()
+key_ops.sort()
+
+pg_queueable = [ 'recovery', 'scrub', 'snaptrim' ]
+
+cat_list = [ 'client', 'osd_subop', 'reply', 'recovery', 'scrub', 'snaptrim' ];
+
+cat_map = { 42: 'client',
+            76: 'osd_subop',
+            77: 'reply',
+            93: 'scrub',
+            94: 'recovery',
+            95: 'recovery',
+            105: 'recovery',
+            106: 'recovery',
+            107: 'recovery',
+            112: 'osd_subop',
+            113: 'reply',
+            114: 'client',
+            115: 'reply' }
+if not set(cat_map.values()).issubset(set(cat_list)):
+    print "ERROR: categories", set(cat_map.values()), "is not subset of", set(cat_list)
+    sys.exit(2)
+
+infile = sys.argv[1]
+if infile[-4:] != '.log':
+    print >> sys.stderr, infile, \
+        'does not appear to be an OSD log file; does not end in \'.log\''
+    sys.exit(1)
+
+outfile = infile.replace('.log', '.csv')
+
+clump=1.0
+if len(sys.argv) >= 3:
+    if sys.argv[2].find('.') >= 0:
+        clump = float(sys.argv[2])
+    else:
+        clump = int(sys.argv[2])
+print "clumping in %s-second intervals" % (str(clump))
+
+filter = 0
+if len(sys.argv) >= 4:
+    filter = int(sys.argv[3])
+if filter > 0:
+    print "filtering entries before %d seconds" % (filter)
+
+LARGE = 2**31
+end_filter = LARGE
+if len(sys.argv) >= 5:
+    end_filter = int(sys.argv[4])
+if end_filter != LARGE:
+    print "only keeping entries for %d seconds" % (end_filter)
+
+count = 0
+
+    
+counts = dict()
+for op in key_ops + pg_queueable:
+    counts[op] = 0
+for cat in cat_list:
+    counts[cat + '_total'] = 0
+
+with open(outfile, 'w') as out:
+    out.write("start")
+    for op in key_ops:
+        out.write(",%s" % (ops[op]))
+    for op in pg_queueable:
+        out.write(",%s" % ("pgq_" + op))
+    for c in cat_list:
+        out.write(",%s_total" % (c))
+    out.write("\n")
+
+    with open(infile) as ins:
+        for line in ins:
+            timestamp = datetime.datetime.strptime(line[:26],
+                                                   "%Y-%m-%d %H:%M:%S.%f")
+
+            if count == 0:
+                basetime = timestamp
+                cursor = 0
+            count += 1
+
+            seconds = (timestamp - basetime).total_seconds()
+            while seconds > cursor + clump:
+                if cursor >= filter and (LARGE == end_filter or
+                                         cursor - filter < end_filter):
+                    out.write("%d" % (cursor - filter))
+                    for op in key_ops + pg_queueable:
+                        out.write(",%d" % (counts[op]))
+                        counts[op] = 0
+                    for cat in cat_list:
+                        idx = cat + "_total"
+                        out.write(",%d" % (counts[idx]))
+                        counts[idx] = 0
+                    out.write("\n")
+                cursor += clump
+
+            for op in key_ops:
+                if line.find("opval:" + str(op) + ' ') >= 0:
+                    counts[op] += 1
+                    counts[ cat_map[op] + "_total" ] += 1
+            for op in pg_queueable:
+                if line.find("op:" + op) >= 0:
+                    counts[op] += 1
+                    counts[ op + "_total" ] += 1
+
+        if cursor >= filter and (LARGE == end_filter or
+                                 cursor - filter < end_filter):
+            out.write("%d" % (cursor - filter))
+            for op in key_ops + pg_queueable:
+                out.write(",%d" % (counts[op]))
+                counts[op] = 0
+            for cat in cat_list:
+                idx = cat + "_total"
+                out.write(",%d" % (counts[idx]))
+                counts[idx] = 0
+            out.write("\n")
+
+print count, "records processed;", min(cursor - filter, end_filter), "seconds of data produced"
