@@ -10,7 +10,7 @@ obj_size_factor=1
 obj_size=$(expr $block_size \* $obj_size_factor)
 parallel=1
 
-. ~/bin/locatecephbuild
+. $(dirname $0)/locatecephbuild
 build_dir=`locate_build`
 
 for i in "$@" ;do
@@ -98,9 +98,6 @@ if [ -z "$mode" ] ;then
     echo Error: must specify --prep, --scrub, or --deepscrub
     exit 1
 fi
-
-. ~/bin/locatecephbuild
-build_dir=`locate_build`
 
 cd ${build_dir}
 pool=scrub-expt

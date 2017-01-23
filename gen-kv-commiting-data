@@ -8,7 +8,7 @@ fi
 key=$1
 
 for f in out/osd*log ; do
-    echo "# 1:osd 2:tx_total_time_nsec 3:kv_committing_count 4:total_ops 5:total_bytes 6:mean_ops 7:mean_bytes 8:early_ops_queue_size 9:early_bytes_queue_size 10:early_wal_ops_queue_size 11:early_wal_bytes_queue_size 12:late_ops_queue_size 13:late_bytes_queue_size 14:late_wal_ops_queue_size 15:late_wal_bytes_queue_size"
+    echo "# 1:osd 2:tx_total_time_nsec 3:kv_committing_count 4:total_ops 5:total_bytes 6:mean_ops 7:mean_bytes 8:early_ops_queue_size 9:early_bytes_queue_size 10:early_wal_ops_queue_size 11:early_wal_bytes_queue_size 12:late_ops_queue_size 13:late_bytes_queue_size 14:late_wal_ops_queue_size 15:late_wal_bytes_queue_size 16:time_to_commit"
     osd=$(echo $f | sed 's/.*osd\.\(.*\)\.log/\1/')
     grep kv_committing_data $f | \
     	 sed 's/.*kv_committing_data (\(.*\))$/\1/' | \

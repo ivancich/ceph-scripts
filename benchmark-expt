@@ -1,0 +1,160 @@
+#!/bin/bash
+
+. ~/bin/locatecephbuild
+build_dir=`locate_build`
+
+concurrent=4
+run_time=120
+block_size=524288
+obj_size_factor=1
+obj_size=$(expr $block_size \* $obj_size_factor)
+parallel=1
+
+for i in "$@" ;do
+    case $i in
+	--time=*)
+	    run_time="${i#*=}"
+	    shift
+	    ;;
+	-c=*|--concurrent=*)
+	    concurrent="${i#*=}"
+	    shift
+	    ;;
+	--prep)
+	    mode=prep
+	    shift # past argument=value
+	    ;;
+	--run)
+	    mode=run
+	    shift # past argument=value
+	    ;;
+	--help)
+	    echo $0 [mode] [limit] [options]
+	    echo "    mode is one of --prep or --run"
+	    echo "    limits are:"
+	    echo "        --time=<seconds>"
+	    echo "    options are:"
+	    echo "        --concurrent=<concurrent-operations>"
+	    exit 0
+	    ;;
+	*)
+	    echo "Unknown argument $i"
+	    error=1
+	    ;;
+    esac
+done
+
+if [ "$error" = "1" ] ;then
+    echo Error: command-line options.
+    exit 1
+fi
+
+if [ -z "$mode" ] ;then
+    echo Error: must specify --prep or --run.
+    exit 1
+fi
+
+cd /home/ivancich/ceph-work/build
+pool=radosbench
+prefix=radosbench
+
+conf=${build_dir}/ceph.conf
+
+if grep -q "^[^;]*osd[ _]*objectstore.*bluestore" $conf ;then
+    echo detected bluestore
+    store="--bluestore"
+else
+    echo detected filestore
+    store=""
+fi
+
+cd $build_dir
+
+if [ "$mode" = "prep" ] ; then
+# start ceph
+    ../src/stop.sh
+
+    ../src/vstart.sh --osd_num 5 --mon_num 3 --mds_num 0 -d -k -l --short $store 2>/dev/null
+
+    for o in 0 1 2 3 4 ; do
+	bin/ceph osd in $o
+    done
+
+    # delete pool
+    bin/ceph osd pool delete $pool $pool --yes-i-really-really-mean-it
+
+    # create pool named data
+    bin/ceph osd pool create $pool 150
+
+    exit 0
+fi
+
+prefix="regbench"
+
+# find unique suffix based on date/time
+stamp=$(date "+%m%d%H%M")
+set -o noclobber
+for s in a b c d e f g h i j k l m n o p q r s t u v w x y z ;do
+    id="${stamp}${s}"
+    info="${prefix}-info-${id}.txt"
+    { > $info ; } &> /dev/null
+    if [ $? -eq 0 ] ;then break ;fi
+done
+set +o noclobber
+
+run_name="ei-rb-run"
+out_summary="${prefix}-summary-${id}.txt"
+oplog=${prefix}-oplog-${id}.log
+
+echo Running rados bench for $run_time seconds
+
+start=`date`
+
+# test
+count=0
+while [ $count -lt $parallel ] ;do
+set -x
+(bin/rados -b $block_size -o $obj_size -p $pool bench $run_time write -t $concurrent --no-cleanup --run-name ${run_name}.$count >${out_summary}.$count ; echo "rados $count finished at $(date)") &
+set +x
+count=$(expr $count + 1)
+done
+
+echo "All rados bench processes started."
+
+sleep $run_time
+sleep 10 # extra 10 seconds
+
+echo "finishing up $(date)"
+
+stop=`date`
+
+ps x | grep osd
+
+# echo WOULD HAVE STOPPED NOW
+stopceph
+
+grep -h OPWATCH out/osd.*.log | sort > $oplog
+
+# record some information in a .txt file
+
+echo "concurrent = ${concurrent}" >>$info
+echo "parallel = ${parallel}" >>$info
+echo "mode = ${mode}" >>$info
+echo "run_time = $run_time" >>$info
+
+# run-time
+echo "$start" >>$info
+echo "$stop" >>$info
+
+# git branch/commit
+git branch --no-color 2>/dev/null |
+    sed -e '/^[^*]/d' -e 's/* \(.*\)/branch: \1/' >>$info
+echo "commit: $(git rev-parse HEAD)" >>$info
+
+# config
+echo "==== ceph.conf start ====" >>$info
+cat ceph.conf >>$info
+echo "==== ceph.conf end ====" >>$info
+
+# memory
+free >>$info
