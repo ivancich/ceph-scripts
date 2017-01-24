@@ -1,7 +1,6 @@
 #!/bin/sh
 
 . $(dirname $0)/locatecephbuild
-
 build_dir=`locate_build`
 
 conf=${build_dir}/ceph.conf

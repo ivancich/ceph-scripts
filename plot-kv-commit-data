@@ -37,7 +37,7 @@ if false ;then
 EOF
 fi
 
-if true ; then
+if false ; then
     cat <<EOF | tee /dev/null | gnuplot -p
     set title "$datafile"
     set xlabel "bytes"
@@ -48,6 +48,31 @@ if true ; then
          "$tempfile" using (column(5)+column(9)):2 title "bytes in commit block + bytes in throttle" with points ls 4
 EOF
 fi
+
+# bytes against max latency
+if true ; then
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 9:2 title "bytes in throttle / max latency" with points ls 1,\
+         "$tempfile" using 5:2 title "bytes in commit block / max latency" with points ls 2
+EOF
+fi
+
+# bytes against mean latency
+if true ; then
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 9:17 title "bytes in throttle / avg latency" with points ls 3,\
+         "$tempfile" using 5:17 title "bytes in commit block / avg latency" with points ls 4
+EOF
+fi
+
 
 # the three plots separated
 
