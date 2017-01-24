@@ -1,0 +1,130 @@
+#!/bin/bash
+
+if [ $# -ne 1 ] ;then
+    echo "Usage: $0 datafile"
+    exit 1
+fi
+
+datafile=$1
+tempfile=/tmp/plot.$$
+
+if hash shuf 2>/dev/null; then
+    shuf $datafile > $tempfile
+elif hash gshuf 2>/dev/null; then
+    gshuf $datafile > $tempfile
+else
+    cp $datafile $tempfile
+fi
+
+linestyles='
+    set style line 1 pt 1 ps 1 lc "#5da5da" # blue
+    set style line 2 pt 1 ps 1 lc "#faa43a" # orange
+    set style line 3 pt 1 ps 1 lc "#f17cb0" # pink
+    set style line 4 pt 1 ps 1 lc "#60bd68" # green
+    set style line 5 pt 1 ps 1 lc "#f15854" # red
+    set style line 6 pt 1 ps 1 lc "#decf3f" # yellow
+'
+
+if false ;then
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "ops"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 4:2 title "ops in commit block" with points ls 1,\
+         "$tempfile" using 8:2 title "ops in throttle" with points ls 2,\
+         "$tempfile" using (column(4)+column(8)):2 title "op in commit block + ops in throttle" with points ls 4
+EOF
+fi
+
+if true ; then
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 5:2 title "bytes in commit block" with points ls 1,\
+         "$tempfile" using 9:2 title "bytes in throttle" with points ls 2,\
+         "$tempfile" using (column(5)+column(9)):2 title "bytes in commit block + bytes in throttle" with points ls 4
+EOF
+fi
+
+# the three plots separated
+
+if false ; then
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 5:2 title "bytes in commit block" with points ls 1
+EOF
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 9:2 title "bytes in throttle" with points ls 2
+EOF
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes"
+    set ylabel "latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using (column(5)+column(9)):2 title "bytes in commit block + bytes in throttle" with points ls 4
+EOF
+
+fi
+
+# plotting size of commit block in bytes against time to commit
+
+if false ; then
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "count"
+    set ylabel "time to commit (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 3:16 title "# transactions in commit block" with points ls 1, \
+         "$tempfile" using 4:16 title "# ops in commit block" with points ls 5
+EOF
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "count"
+    set ylabel "time to commit (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 5:16 title "# bytes in commit block" with points ls 6
+EOF
+
+fi
+
+
+exit 0
+count=0
+
+makeplot() {
+    xcol=$1
+    xlabel="$2"
+    ycol=$3
+    ylabel="$4"
+    title="$datafile"
+    if [ $# -ge 5 ] ;then
+	title="$5"
+    fi
+cat <<EOF | tee /tmp/foobar | gnuplot -p
+    set title "$title"
+    set xlabel "$xlabel"
+    set ylabel "$ylabel"
+    set zlabel "OSD #"
+    set cbrange [0:4]
+    set palette defined ( 0 "#8080FF", 1 "#60FF60", 2 "#FFFF40", 3 "#FFC040", 4 "#FF8080" )
+    plot "$datafile" using ${xcol}:${ycol}:1 notitle with points lc palette z
+EOF
+}
+
+makeplot 4 "ops in kv commit block" 2 "latency nanoseconds" "foobar"
+makeplot "(column(4) + column(8))" "ops in kv commit block + throttle ops" 2 "latency nanoseconds" "foobar"
+makeplot 8 "throttle ops" 2 "latency nanoseconds" "foobar"

@@ -49,8 +49,8 @@ EOF
 
 # makeplot wal_ops 4 "# transaction elements on queue"
 makeplot wal_ops 4 "# transaction elements on queue"
-# makeplot wal_bytes 4 "# transaction bytes on queue"
+makeplot wal_bytes 4 "# transaction bytes on queue"
 # makeplot wal_ops 3 "# transaction contexts queue"
 # makeplot wal_ops 4 "# transaction elements on queue"
 # makeplot wal_ops "(floor(column(6) * 10000) % 10000)" "arrival into queue"
-makeplot wal_ops "(floor(column(6) * 1000) % 1000)" "ms into sec arrival into queue"
+# makeplot wal_ops "(floor(column(6) * 1000) % 1000)" "ms into sec arrival into queue"
