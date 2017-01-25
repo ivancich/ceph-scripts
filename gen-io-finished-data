@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ $# -ne 1 ] ; then
+   echo "Usage: $0 key"
+   exit 1
+fi
+
+key=$1
+
+for f in out/osd*log ; do
+    echo "# io finished data"
+    echo "# 1:osd 2:io_done_latency_nsec 3:ops_txc_size 4:wal_ops_txc_size 5:bytes_txc_size 6:wal_bytes_txc_size 7:ops_queue_size 8:wal_ops_queue_size 9:bytes_queue_size 10:wal_bytes_queue_size"
+    osd=$(echo $f | sed 's/.*osd\.\(.*\)\.log/\1/')
+    grep trans_context_io_done_data $f | \
+    	 sed 's/.*trans_context_io_done_data (\(.*\))$/\1/' | \
+    	 sed 's/,/ /g' | \
+	 sed "s/\(.*\)/${osd} \1/"
+done > io-finished-${key}.data

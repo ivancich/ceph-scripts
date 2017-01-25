@@ -5,13 +5,14 @@ if [ $# -ne 1 ] ;then
     exit 1
 fi
 
+
 datafile=$1
 tempfile=/tmp/plot.$$
 
-if grep -q "kv committing data" $datafile ;then
+if grep -q "io finished data" $datafile ;then
     :
 else
-    echo "error: does not appear to be a 'kv committing data' file"
+    echo "error: does not appear to be a 'io finished data' file"
     exit 2
 fi
 
@@ -29,20 +30,46 @@ linestyles='
     set style line 3 pt 1 ps 1 lc "#f17cb0" # pink
     set style line 4 pt 1 ps 1 lc "#60bd68" # green
     set style line 5 pt 1 ps 1 lc "#f15854" # red
-    set style line 6 pt 1 ps 1 lc "#decf3f" # yellow
+    set style line 6 pt 1 ps 1 lc "#aa7878" # purple
+    set style line 7 pt 1 ps 1 lc "#decf3f" # yellow
+    set style line 8 pt 1 ps 1 lc "#9a9a9a" # gray
 '
 
-if false ;then
+if true ;then
     cat <<EOF | tee /dev/null | gnuplot -p
     set title "$datafile"
-    set xlabel "ops"
-    set ylabel "latency (nanoseconds)
+    set xlabel "ops in transaction"
+    set ylabel "io complete latency (nanoseconds)
     $linestyles
-    plot "$tempfile" using 4:2 title "ops in commit block" with points ls 1,\
-         "$tempfile" using 8:2 title "ops in throttle" with points ls 2,\
-         "$tempfile" using (column(4)+column(8)):2 title "op in commit block + ops in throttle" with points ls 4
+    plot "$tempfile" using 3:2 title "ops in txc / aio latency" with points ls 5
+EOF
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "ops in throttle"
+    set ylabel "io complete latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 7:2 title "ops in throttle / aio latency" with points ls 6
+EOF
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes in transaction"
+    set ylabel "io complete latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 5:2 title "bytes in txc / aio latency" with points ls 7
+EOF
+
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes in throttle"
+    set ylabel "io complete latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 9:2 title "bytes in throttle / aio latency" with points ls 8
 EOF
 fi
+
+exit
 
 if false ; then
     cat <<EOF | tee /dev/null | gnuplot -p
