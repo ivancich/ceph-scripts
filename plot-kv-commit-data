@@ -49,27 +49,35 @@ if false ; then
 EOF
 fi
 
-# bytes against max latency
+# bytes against max and mean latency
 if true ; then
     cat <<EOF | tee /dev/null | gnuplot -p
     set title "$datafile"
-    set xlabel "bytes"
-    set ylabel "latency (nanoseconds)
+    set xlabel "bytes in throttle"
+    set ylabel "max latency (nanoseconds)
     $linestyles
-    plot "$tempfile" using 9:2 title "bytes in throttle / max latency" with points ls 1,\
-         "$tempfile" using 5:2 title "bytes in commit block / max latency" with points ls 2
+    plot "$tempfile" using 9:2 title "bytes in throttle / max latency" with points ls 1
 EOF
-fi
-
-# bytes against mean latency
-if true ; then
     cat <<EOF | tee /dev/null | gnuplot -p
     set title "$datafile"
-    set xlabel "bytes"
-    set ylabel "latency (nanoseconds)
+    set xlabel "bytes in commit block"
+    set ylabel "max latency (nanoseconds)
     $linestyles
-    plot "$tempfile" using 9:17 title "bytes in throttle / avg latency" with points ls 3,\
-         "$tempfile" using 5:17 title "bytes in commit block / avg latency" with points ls 4
+    plot "$tempfile" using 5:2 title "bytes in commit block / max latency" with points ls 2
+EOF
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes in throttle"
+    set ylabel "mean latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 9:17 title "bytes in throttle / avg latency" with points ls 3
+EOF
+    cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes in commit block"
+    set ylabel "mean latency (nanoseconds)
+    $linestyles
+    plot "$tempfile" using 5:17 title "bytes in commit block / avg latency" with points ls 4
 EOF
 fi
 
