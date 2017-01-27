@@ -49,7 +49,7 @@ EOF
     set xlabel "ops in throttle"
     set ylabel "io complete latency (nanoseconds)
     $linestyles
-    plot "$tempfile" using 7:2 title "ops in throttle / aio latency" with points ls 6
+    plot "$tempfile" using (column(3) + column(7)):2 title "ops in throttle / aio latency" with points ls 6
 EOF
 
     cat <<EOF | tee /dev/null | gnuplot -p
@@ -65,7 +65,7 @@ EOF
     set xlabel "bytes in throttle"
     set ylabel "io complete latency (nanoseconds)
     $linestyles
-    plot "$tempfile" using 9:2 title "bytes in throttle / aio latency" with points ls 8
+    plot "$tempfile" using (column(5) + column(9)):2 title "bytes in throttle / aio latency" with points ls 8
 EOF
 fi
 
