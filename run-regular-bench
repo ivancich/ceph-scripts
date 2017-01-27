@@ -71,4 +71,21 @@ while true ; do
     stopceph
 done
 
-benchmark-expt --run -c=500
+# set to true to cause delay giving time to attach gdb to, for
+# example, a ceph-osd process
+if false ; then
+    echo "TEMPORARY Running experiment in 40 seconds..."
+    bell 5
+    sleep 20
+    echo "TEMPORARY Running experiment in 20 seconds..."
+    bell 5
+    sleep 10
+    echo "TEMPORARY Running experiment in 10 seconds..."
+    bell 5
+    sleep 5
+    echo "TEMPORARY Running experiment in 5 seconds..."
+    bell 5
+    sleep 5
+fi
+
+benchmark-expt --run -c=16 -b=4096

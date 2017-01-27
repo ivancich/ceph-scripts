@@ -7,13 +7,16 @@ concurrent=4
 run_time=120
 block_size=524288
 obj_size_factor=1
-obj_size=$(expr $block_size \* $obj_size_factor)
 parallel=1
 
 for i in "$@" ;do
     case $i in
 	--time=*)
 	    run_time="${i#*=}"
+	    shift
+	    ;;
+	-b=*|--blocksize=*)
+	    block_size="${i#*=}"
 	    shift
 	    ;;
 	-c=*|--concurrent=*)
@@ -43,6 +46,8 @@ for i in "$@" ;do
 	    ;;
     esac
 done
+
+obj_size=$(expr $block_size \* $obj_size_factor)
 
 if [ "$error" = "1" ] ;then
     echo Error: command-line options.
