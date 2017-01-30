@@ -59,7 +59,7 @@ if [ -z "$mode" ] ;then
     exit 1
 fi
 
-cd /home/ivancich/ceph-work/build
+cd ${build_dir}
 pool=radosbench
 prefix=radosbench
 
@@ -72,8 +72,6 @@ else
     echo detected filestore
     store=""
 fi
-
-cd $build_dir
 
 if [ "$mode" = "prep" ] ; then
 # start ceph

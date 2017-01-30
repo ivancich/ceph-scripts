@@ -1,12 +1,11 @@
 #!/bin/sh
 
 locate_build() {
-  if pwd | grep -q ceph-work ; then
-    echo ~/ceph-work/build
-  elif pwd | grep -q ceph-master ; then
-    echo ~/ceph-master/build
+  if pwd | egrep -q "/build(/.*)?$" ;then
+      pwd | sed 's|\(.*/build\)\(/.*\)\?$|\1|'
+      exit 0
   else
-    echo Please run this from one of the known build directories.
-    exit 1
+      >&2 echo "Error: not recognized as a build directory."
+      exit 1
   fi
 }
