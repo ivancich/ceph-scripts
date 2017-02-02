@@ -1,0 +1,137 @@
+#!/bin/bash
+
+    linestyles='
+        set style line 1 pt 1 ps 1 lc "#5da5da" # blue
+        set style line 2 pt 1 ps 1 lc "#faa43a" # orange
+        set style line 3 pt 1 ps 1 lc "#f17cb0" # pink
+        set style line 4 pt 1 ps 1 lc "#60bd68" # green
+        set style line 5 pt 1 ps 1 lc "#f15854" lw 2 # red
+        set style line 6 pt 1 ps 1 lc "#eeee3f" lw 2 # yellow
+        set style line 7 pt 1 ps 1 lc "#5555ff" lw 2 # blue
+        set style line 8 pt 1 ps 1 lc "#000000" lw 2 # black
+'
+
+    reducexrange='
+        # set xrange[0:200000]
+        # set xrange[0:900000]
+	# set xrange[0:100000]
+	# set xrange[0:20000]
+	# set xrange[0:1000000]
+'
+    reduceyrange='
+        # set yrange[0:1000000]
+        # set yrange[0:800000000]
+        # set yrange[0:1000000000]
+        # set yrange[0:10000000]
+        # set yrange[0:200000]
+        # set yrange[0:800000000]
+'
+
+    quadcurves='
+        fitquad16(x) = 9858351.69226 + x * 1330.259633 + x**2 * -0.0109690810943
+        fitquad32(x) = 9033697.92017 + x * 655.539189976 + x**2 * -0.00213120558049
+        fitquad64(x) = 1803863.37049 + x * 595.693475969 + x**2 * -0.00080447589646
+        fitquad128(x) = 549262.417093 + x * 432.361889503 + x**2 * -0.000248430176952
+	fitquadcomb(x) = 14731879.8304 + x * 410.374689099 + x**2 * -0.000262413459597
+'
+
+    cubiccurves='
+	fitcubic16(x) = 0.170805987444 + x * 2626.87403588 + x**2 * -0.0424233178651 + x**3 * 2.03753715646e-07
+	fitcubic32(x) = 0.0456435360035 + x * 1298.95447953 + x**2 * -0.0102674753994 + x**3 * 2.70691263584e-08
+	fitcubic64(x) = 0.0132131207673 + x * 691.710422679 + x**2 * -0.00146473219009 + x**3 * 1.14284918287e-09
+	fitcubic128(x) = 1.56520551649e-14 + x * 5.13615538323e-09 + x**2 * 0.00136903125469 + x**3 * -1.40511899482e-09
+	fitcubiccomb(x) = 4.05934498133e-14 + x * 8.95333502608e-09 + x**2 * 0.0019098209145 + x**3 * -2.2541254883e-09
+'
+
+    quarticcurves='
+	fitquartic16(x) = 7.86064778528e-11 + x * 2.51280269675e-06 + x**2 * 0.0600219613301 + x**3 * -1.03430953007e-06 + x**4 * 4.58513167933e-12
+	fitquartic32(x) = 7.21920873107e-12 + x * 4.22300673162e-07 + x**2 * 0.0184177662113 + x**3 * -1.71346755374e-07 + x**4 * 4.27649557832e-13
+	fitquartic64(x) = 6.95277874365e-13 + x * 7.95504638263e-08 + x**2 * 0.00679127524162 + x**3 * -2.9627181487e-08 + x**4 * 3.55053164986e-14
+	fitquartic128(x) = 7.12845671913e-26 + x * 2.81586197815e-20 + x**2 * 1.04880427044e-14 + x**3 * 3.08150933478e-09 + x**4 * -3.47907947598e-15
+	fitquarticcomb(x) = 1.28267401009e-25 + x * 4.13435811694e-20 + x**2 * 1.38285466621e-14 + x**3 * 3.83467572108e-09 + x**4 * -4.54718169124e-15
+'
+
+    if true ; then
+    # bytes against max and mean latency
+    cat <<EOF | tee /dev/null | gnuplot -p
+        set title "t16 fit"
+        set xlabel "bytes in throttle"
+        set ylabel "avg aio latency in commit block (nanoseconds)
+        $reducexrange
+        $reduceyrange
+        $linestyles
+	$quadcurves
+	$cubiccurves
+	$quarticcurves
+        plot "kv-committing-regbench-l-t16.data" using (column(9) + column(5)):19 title "t16 avg latency" with points ls 1, \
+             fitquad16(x) title "quadratic fit" ls 7, \
+             fitcubic16(x) title "cubic fit" ls 5, \
+             fitquartic16(x) title "quartic fit" ls 6
+EOF
+    cat <<EOF | tee /dev/null | gnuplot -p
+        set title "t32 fit"
+        set xlabel "bytes in throttle"
+        set ylabel "avg aio latency in commit block (nanoseconds)
+        $reducexrange
+        $reduceyrange
+        $linestyles
+	$cubiccurves
+	$quadcurves
+	$quarticcurves
+        plot "kv-committing-regbench-l-t32.data" using (column(9) + column(5)):19 title "t32 avg latency" with points ls 2, \
+             fitquad32(x) title "quadratic fit" ls 7, \
+             fitcubic32(x) title "cubic fit" ls 5, \
+             fitquartic32(x) title "quartic fit" ls 6
+EOF
+    cat <<EOF | tee /dev/null | gnuplot -p
+        set title "t64 fit"
+        set xlabel "bytes in throttle"
+        set ylabel "avg aio latency in commit block (nanoseconds)
+        $reducexrange
+        $reduceyrange
+        $linestyles
+	$cubiccurves
+	$quadcurves
+	$quarticcurves
+        plot "kv-committing-regbench-l-t64.data" using (column(9) + column(5)):19 title "t64 avg latency" with points ls 3, \
+             fitquad64(x) title "quadratic fit" ls 7, \
+             fitcubic64(x) title "cubic fit" ls 5, \
+             fitquartic64(x) title "quartic fit" ls 6
+EOF
+    cat <<EOF | tee /dev/null | gnuplot -p
+        set title "t128 fit"
+        set xlabel "bytes in throttle"
+        set ylabel "avg aio latency in commit block (nanoseconds)
+        $reducexrange
+        $reduceyrange
+        $linestyles
+	$cubiccurves
+	$quadcurves
+	$quarticcurves
+        plot "kv-committing-regbench-l-t128.data" using (column(9) + column(5)):19 title "t128 avg latency" with points ls 4, \
+             fitquad128(x) title "quadratic fit" ls 7, \
+             fitcubic128(x) title "cubic fit" ls 5, \
+             fitquartic128(x) title "quartic fit" ls 6
+EOF
+    fi
+
+    if true ; then
+    cat <<EOF | tee /dev/null | gnuplot -p
+        set title "t16,32,64,128 fits"
+        set xlabel "bytes in throttle"
+        set ylabel "avg aio latency in commit block (nanoseconds)
+        $reducexrange
+        $reduceyrange
+        $linestyles
+	$cubiccurves
+	$quadcurves
+	$quarticcurves
+        plot "kv-committing-regbench-l-t16.data" using (column(9) + column(5)):19 title "t16 avg latency" with points ls 1, \
+	     "kv-committing-regbench-l-t32.data" using (column(9) + column(5)):19 title "t32 avg latency" with points ls 2, \
+	     "kv-committing-regbench-l-t64.data" using (column(9) + column(5)):19 title "t64 avg latency" with points ls 3, \
+	     "kv-committing-regbench-l-t128.data" using (column(9) + column(5)):19 title "t128 avg latency" with points ls 4, \
+             fitquadcomb(x) title "quadratic fit" ls 7, \
+             fitcubiccomb(x) title "cubic fit" ls 5, \
+             fitquarticcomb(x) title "quartic fit" ls 6
+EOF
+    fi

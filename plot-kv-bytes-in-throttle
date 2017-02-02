@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [ $# -lt 1 ] ;then
+    echo "Usage: $0 datafile ..."
+    exit 1
+fi
+
+while [ $# -gt 0 ] ;do
+
+datafile=$1
+shift
+tempfile=/tmp/plot.$$
+
+if grep -q "kv committing data" $datafile ;then
+    :
+else
+    echo "error: $datafile does not appear to be a 'kv committing data' file"
+    exit 2
+fi
+
+if hash shuf 2>/dev/null; then
+    shuf $datafile > $tempfile
+elif hash gshuf 2>/dev/null; then
+    gshuf $datafile > $tempfile
+else
+    cp $datafile $tempfile
+fi
+
+linestyles='
+    set style line 1 pt 1 ps 1 lc "#5da5da" # blue
+    set style line 2 pt 1 ps 1 lc "#faa43a" # orange
+    set style line 3 pt 1 ps 1 lc "#f17cb0" # pink
+    set style line 4 pt 1 ps 1 lc "#60bd68" # green
+    set style line 5 pt 1 ps 1 lc "#f15854" # red
+    set style line 6 pt 1 ps 1 lc "#decf3f" # yellow
+'
+
+reduceyrange='
+    # set yrange[0:20000000]
+    # set yrange[0:5000000]
+'
+
+# bytes against max and mean latency
+cat <<EOF | tee /dev/null | gnuplot -p
+    set title "$datafile"
+    set xlabel "bytes in throttle"
+    set ylabel "max latency (nanoseconds)
+    set xrange[0:15000]
+    $reduceyrange
+    $linestyles
+    plot "$tempfile" using (column(9) + column(5)):2 title "bytes in throttle / max latency" with points ls 1
+EOF
+
+
+done

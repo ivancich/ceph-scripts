@@ -32,6 +32,12 @@ linestyles='
     set style line 6 pt 1 ps 1 lc "#decf3f" # yellow
 '
 
+reduceyrange='
+    # set yrange[0:5000000]
+    # set yrange[0:100000000]
+    # set yrange[0:20000000]
+'
+
 if false ;then
     cat <<EOF | tee /dev/null | gnuplot -p
     set title "$datafile"
@@ -62,15 +68,19 @@ if true ; then
     set title "$datafile"
     set xlabel "bytes in throttle"
     set ylabel "max latency (nanoseconds)
-    set yrange[0:5000000]
+    set xrange[0:15000]
+    set yrange[0:20000000]
     $linestyles
     plot "$tempfile" using (column(9) + column(5)):2 title "bytes in throttle / max latency" with points ls 1
 EOF
+
+    exit 0
+
     cat <<EOF | tee /dev/null | gnuplot -p
     set title "$datafile"
     set xlabel "bytes in commit block"
     set ylabel "max latency (nanoseconds)
-    set yrange[0:5000000]
+    $reduceyrange
     $linestyles
     plot "$tempfile" using 5:2 title "bytes in commit block / max latency" with points ls 2
 EOF
@@ -78,7 +88,7 @@ EOF
     set title "$datafile"
     set xlabel "bytes in throttle"
     set ylabel "mean latency (nanoseconds)
-    set yrange[0:5000000]
+    $reduceyrange
     $linestyles
     plot "$tempfile" using (column(9) + column(5)):17 title "bytes in throttle / avg latency" with points ls 3
 EOF
@@ -86,7 +96,7 @@ EOF
     set title "$datafile"
     set xlabel "bytes in commit block"
     set ylabel "mean latency (nanoseconds)
-    set yrange[0:5000000]
+    $reduceyrange
     $linestyles
     plot "$tempfile" using 5:17 title "bytes in commit block / avg latency" with points ls 4
 EOF
@@ -94,7 +104,7 @@ EOF
     set title "$datafile"
     set xlabel "bytes in throttle"
     set ylabel "max latency (nanoseconds)
-    set yrange[0:5000000]
+    $reduceyrange
     $linestyles
     plot "$tempfile" using (column(9) + column(5)):2 title "bytes in throttle / max latency" with points ls 1, \
          "$tempfile" using (column(9) + column(5)):17 title "bytes in throttle / avg latency" with points ls 3
@@ -103,7 +113,7 @@ EOF
     set title "$datafile"
     set xlabel "bytes in throttle"
     set ylabel "max latency (nanoseconds)
-    set yrange[0:5000000]
+    $reduceyrange
     $linestyles
     plot "$tempfile" using (column(9) + column(5)):17 title "bytes in throttle / avg latency" with points ls 3, \
          "$tempfile" using (column(9) + column(5)):2 title "bytes in throttle / max latency" with points ls 1
