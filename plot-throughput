@@ -1,0 +1,75 @@
+#!/bin/bash
+
+prologue=/tmp/plot.$$
+combined=/tmp/combined-$$.data
+
+# put two lines that we can skip at start of line
+echo "# skip this" > $combined
+echo "# skip this" >> $combined
+
+cat >$prologue  <<EOF
+        set style line 1 pt 1 ps 1 lc "#66c2a5"
+        set style line 2 pt 1 ps 1 lc "#fc8d62"
+        set style line 3 pt 1 ps 1 lc "#8da0cb"
+        set style line 4 pt 1 ps 1 lc "#e78ac3"
+        set style line 5 pt 1 ps 1 lc "#a6d854"
+        set style line 6 pt 1 ps 1 lc "#ffd92f"
+        set style line 7 pt 1 ps 1 lc "#e5c494"
+        set style line 8 pt 1 ps 1 lc "#b3b3b3"
+        set style line 9 pt 1 ps 1 lc "#ff0000" lw 2
+        set style line 10 pt 1 ps 1 lc "#00ff00" lw 2
+        set style line 11 pt 1 ps 1 lc "#0000ff" lw 2
+	# set xrange[0:140000]
+        # set yrange[0:3000000]
+EOF
+
+plots=""
+count=0
+for f in "$@" ; do
+    sed '/^#/d' $f >> $combined
+    # cat $f >> $combined
+    count=$(expr $count + 1)
+    plot="\"$f\" using (column(9)):20 title \"$f\" with points ls $count"
+    plots="${plot}, ${plots}"
+    cat <<EOF | tee /dev/null | gnuplot -p
+    	$(cat $prologue)
+        set title "$f kv-sync throughput (bytes/sec)"
+        set xlabel "bytes in throttle"
+        set ylabel "throughput (bytes/sec)
+	quadratic(x) = $(throughput.julia $f 2)
+	cubic(x) = $(throughput.julia $f 3)
+	quartic(x) = $(throughput.julia $f 4)
+        plot $plot, \
+             quadratic(x) title "quadratic fit" ls 9, \
+             cubic(x) title "cubic fit" ls 10, \
+             quartic(x) title "quartic fit" ls 11
+	# now output a pdf file
+	set terminal pdf
+	set output '${f}.pdf'
+	replot
+EOF
+done
+
+# remove initial comma
+plots=$(echo $plots | sed 's/^, *//')
+
+cat <<EOF | tee /dev/null | gnuplot -p
+    	$(cat $prologue)
+        set title "multi kv-sync throughput (bytes/sec)"
+        set xlabel "bytes in throttle"
+        set ylabel "throughput (bytes/sec)
+
+	quadratic(x) = $(throughput.julia $combined 2)
+	cubic(x) = $(throughput.julia $combined 3)
+	quartic(x) = $(throughput.julia $combined 4)
+
+        plot $plots \
+             quadratic(x) title "quadratic fit" ls 9, \
+             cubic(x) title "cubic fit" ls 10, \
+             quartic(x) title "quartic fit" ls 11
+
+	# now output a pdf file
+	set terminal pdf
+	set output 'multi-$$.pdf'
+	replot
+EOF
