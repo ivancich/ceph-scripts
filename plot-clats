@@ -1,0 +1,47 @@
+#!/bin/bash
+
+    linestyles='
+        set style line 1 pt 1 ps 1 lc "#5da5da" # blue
+        set style line 2 pt 1 ps 1 lc "#faa43a" # orange
+        set style line 3 pt 1 ps 1 lc "#f17cb0" # pink
+        set style line 4 pt 1 ps 1 lc "#60bd68" # green
+        set style line 5 pt 1 ps 1 lc "#f15854" lw 2 # red
+        set style line 6 pt 1 ps 1 lc "#eeee3f" lw 2 # yellow
+        set style line 7 pt 1 ps 1 lc "#5555ff" lw 2 # blue
+        set style line 8 pt 1 ps 1 lc "#000000" lw 2 # black
+'
+
+    reducexrange='
+        # set xrange[0:200000]
+        # set xrange[0:900000]
+	# set xrange[0:100000]
+	# set xrange[0:20000]
+	# set xrange[0:1000000]
+'
+    reduceyrange='
+        # set yrange[0:1000000]
+        # set yrange[0:800000000]
+        # set yrange[0:1000000000]
+	# set yrange[0:10000000]
+        # set yrange[0:200000]
+        # set yrange[0:800000000]
+'
+    # bytes against max and mean latency
+    cat <<EOF | tee /dev/null | gnuplot -p
+        linear(x) = 1732080.84269 + x * 4736.26192067
+	quadratic(x) = 843546.669323 + x * 5183.69035715 + x**2 * -0.00760305177876
+	set title "fio io_depth to clat, 300gb file"
+        set xlabel "io_depth"
+        set ylabel "clat (nanoseconds)"
+        $linestyles
+	set xrange[0.85:85000]
+	set yrange[:10000000000.0]
+        set datafile separator ","
+	set logscale y
+	set logscale x 2
+        plot "clats.data" using 1:4:5 title "avg clat" w yerrorbars ls 1, \
+            "clats.data" using 1:2 title "min clat" w lines ls 5, \
+            "clats.data" using 1:3 title "max clat" w lines ls 6, \
+	    linear(x) title "linear fit avg clat" ls 2, \
+	    quadratic(x) title "quadratic fit avg clat" ls 3
+EOF
