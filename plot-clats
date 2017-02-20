@@ -11,34 +11,21 @@
         set style line 8 pt 1 ps 1 lc "#000000" lw 2 # black
 '
 
-    reducexrange='
-        # set xrange[0:200000]
-        # set xrange[0:900000]
-	# set xrange[0:100000]
-	# set xrange[0:20000]
-	# set xrange[0:1000000]
-'
-    reduceyrange='
-        # set yrange[0:1000000]
-        # set yrange[0:800000000]
-        # set yrange[0:1000000000]
-	# set yrange[0:10000000]
-        # set yrange[0:200000]
-        # set yrange[0:800000000]
-'
     # bytes against max and mean latency
     cat <<EOF | tee /dev/null | gnuplot -p
         linear(x) = 1732080.84269 + x * 4736.26192067
 	quadratic(x) = 843546.669323 + x * 5183.69035715 + x**2 * -0.00760305177876
-	set title "fio io_depth to clat, 300gb file"
-        set xlabel "io_depth"
-        set ylabel "clat (nanoseconds)"
+	set title "fio io-depth to clat, 300gb file"
+        set xlabel "io-depth"
+        set ylabel "clat (microseconds)"
         $linestyles
-	set xrange[0.85:85000]
-	set yrange[:10000000000.0]
+	# set xrange[0.85:85000]
+	# set yrange[:10000000000.0]
+	set xrange[0:520]
+	set yrange[:3000000]
         set datafile separator ","
-	set logscale y
-	set logscale x 2
+	# set logscale y 2
+	# set logscale x 2
         plot "clats.data" using 1:4:5 title "avg clat" w yerrorbars ls 1, \
             "clats.data" using 1:2 title "min clat" w lines ls 5, \
             "clats.data" using 1:3 title "max clat" w lines ls 6, \
