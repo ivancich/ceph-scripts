@@ -1,0 +1,19 @@
+#!/bin/sh
+
+block_size=4096
+run_time=300
+# 4096 5793 8192 11585 16384
+throttle=11585
+
+last_summary() {
+  ls -tr regbench-summary* | tail -n 1
+}
+
+throttle_dir="throttle-${throttle}"
+
+mkdir $throttle_dir
+for concurrent in 1 2 4 8 16 32 64 128 ;do
+    run-regular-bench -b=${block_size} -c=${concurrent} -t=${run_time}
+    mv $(last_summary) ${throttle_dir}/regbench-summary-t${throttle}-o-c${concurrent}.txt
+    # gen-kv-committing-data "regbench-o-c${concurrent}-t${throttle}"
+done

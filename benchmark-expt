@@ -11,7 +11,7 @@ parallel=1
 
 for i in "$@" ;do
     case $i in
-	--time=*)
+	-t=*|--time=*)
 	    run_time="${i#*=}"
 	    shift
 	    ;;
@@ -114,18 +114,20 @@ echo Running rados bench for $run_time seconds
 start=`date`
 
 # test
-count=0
-while [ $count -lt $parallel ] ;do
-set -x
-(bin/rados -b $block_size -o $obj_size -p $pool bench $run_time write -t $concurrent --no-cleanup --run-name ${run_name}.$count >${out_summary}.$count ; echo "rados $count finished at $(date)") &
-set +x
-count=$(expr $count + 1)
-done
 
-echo "All rados bench processes started."
-
-sleep $run_time
-sleep 10 # extra 10 seconds
+if [ $parallel -eq 1 ] ;then
+    bin/rados -b $block_size -o $obj_size -p $pool bench $run_time write -t $concurrent --no-cleanup --run-name ${run_name} >${out_summary}
+else
+    count=0
+    while [ $count -lt $parallel ] ;do
+	set -x
+	(bin/rados -b $block_size -o $obj_size -p $pool bench $run_time write -t $concurrent --no-cleanup --run-name ${run_name}.$count >${out_summary}.$count ; echo "rados $count finished at $(date)") &
+	set +x
+	count=$(expr $count + 1)
+    done
+    sleep $run_time
+    sleep 10 # extra 10 seconds
+fi
 
 echo "finishing up $(date)"
 
@@ -136,7 +138,7 @@ ps x | grep osd
 # echo WOULD HAVE STOPPED NOW
 stopceph
 
-grep -h OPWATCH out/osd.*.log | sort > $oplog
+# grep -h OPWATCH out/osd.*.log | sort > $oplog
 
 # record some information in a .txt file
 

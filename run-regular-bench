@@ -1,5 +1,30 @@
 #!/bin/sh
 
+concurrent=128
+block_size=4096
+run_time=120
+
+for i in "$@" ;do
+    case $i in
+	-b=*|--blocksize=*)
+	    block_size="${i#*=}"
+	    shift
+	    ;;
+	-c=*|--concurrent=*)
+	    concurrent="${i#*=}"
+	    shift
+	    ;;
+	-t=*|--time=*)
+	    run_time="${i#*=}"
+	    shift
+	    ;;
+	*)
+	    echo "Unknown argument $i"
+	    error=1
+	    ;;
+    esac
+done
+
 wait_health_ok () {
     start=$(date +%s)
 
@@ -88,4 +113,4 @@ if false ; then
     sleep 5
 fi
 
-benchmark-expt --run -c=16 -b=4096
+benchmark-expt --run -c=${concurrent} -b=${block_size} -t=${run_time}
