@@ -1,0 +1,183 @@
+#!/bin/bash
+
+if [ $# -ne 2 ] ;then
+   echo Usage: $0 linear/log scale
+   exit 1
+fi
+
+scalefile=/tmp/plog-scale.$$
+
+if [ $1 == "linear" ] ;then
+   echo "" > $scalefile
+elif [ $1 == "log" ] ;then
+    cat >$scalefile <<EOF
+set logscale x 2
+set logscale y
+EOF
+else
+     echo first arg must be linear or log
+     exit 2
+fi
+
+scale=$2
+
+prologue=/tmp/plot-prologue.$$
+throughput_prologue=/tmp/plot-tp-prologue.$$
+latency_prologue=/tmp/plot-lat-prologue.$$
+
+cat >$prologue <<EOF
+        set style line 1 pt 1 ps 1 lc "#66c2a5"
+        set style line 2 pt 1 ps 1 lc "#fc8d62"
+        set style line 3 pt 1 ps 1 lc "#8da0cb"
+        set style line 4 pt 1 ps 1 lc "#e78ac3"
+        set style line 5 pt 1 ps 1 lc "#a6d854"
+        set style line 6 pt 1 ps 1 lc "#ffd92f"
+        set style line 7 pt 1 ps 1 lc "#e5c494"
+        set style line 8 pt 1 ps 1 lc "#b3b3b3"
+        set style line 9 pt 1 ps 1 lc "#ff0000" lw 2
+        set style line 10 pt 1 ps 1 lc "#00ff00" lw 2
+        set style line 11 pt 1 ps 1 lc "#0000ff" lw 2
+	$(cat $scalefile)
+EOF
+
+cat >$latency_prologue <<EOF
+    # set yrange[10000:]
+    # set yrange[1:10000000]
+EOF
+
+cat >$throughput_prologue <<EOF
+    # empty
+EOF
+
+
+
+if false ;then
+
+
+ls=0
+for concur in 1 2 4 8 16 32 64 128 multi ; do
+    ls=$(expr $ls + 1)
+    cat <<EOF | tee /dev/null | gnuplot -p
+        $(cat $prologue)
+        $(cat $latency_prologue)
+        set datafile separator " "
+        set xlabel "throttle-size"
+        set ylabel "latency nanoseconds"
+
+	set title "regbench-n binned mean latency concurrency $concur"
+	set terminal pdf
+	set output 'combined-latency-${concur}-${scale}.pdf'
+        plot "kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:3:4 title "concurrency $concur" w yerrorbars ls ${ls}
+	# replot
+EOF
+done
+
+ls=0
+for concur in 1 2 4 8 16 32 64 128 multi ; do
+    ls=$(expr $ls + 1)
+    cat <<EOF | tee /dev/null | gnuplot -p
+        $(cat $prologue)
+        $(cat $throughput_prologue)
+        set datafile separator " "
+        set xlabel "throttle-size"
+        set ylabel "throughput (bytes/sec)"
+
+	set title "regbench-n binned mean throughput concurrency $concur"
+	set terminal pdf
+	set output 'combined-throughput-${concur}-${scale}.pdf'
+        plot "kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:5:6 title "concurrency $concur" w yerrorbars ls ${ls}
+	# replot
+EOF
+done
+fi
+
+ls=0
+for concur in 1 2 4 8 16 32 64 128 multi ; do
+    ls=$(expr $ls + 1)
+    cat <<EOF | tee foobar | gnuplot -p
+        $(cat $prologue)
+        $(cat $latency_prologue)
+        set datafile separator " "
+        set xlabel "throttle-size"
+        set ylabel "latency nanoseconds"
+
+	set title "regbench-n binned WEIGHTED mean latency concurrency $concur"
+	set terminal pdf
+	set output 'combined-weighted-latency-${concur}-${scale}.pdf'
+        plot "kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:7:8 title "mean" w yerrorbars ls ${ls}, \
+	"kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:11 title "min" w lines ls 10, \
+	"kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:12 title "max" w lines ls 11
+	# replot
+EOF
+done
+
+
+ls=0
+for concur in 1 2 4 8 16 32 64 128 multi ; do
+    ls=$(expr $ls + 1)
+    cat <<EOF | tee /dev/null | gnuplot -p
+        $(cat $prologue)
+        $(cat $throughput_prologue)
+        set datafile separator " "
+        set xlabel "throttle-size"
+        set ylabel "throughput (bytes/sec)"
+
+	set title "regbench-n binned WEIGHTED mean throughput concurrency $concur"
+	set terminal pdf
+	set output 'combined-weighted-throughput-${concur}-${scale}.pdf'
+        plot "kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:9:10 title "mean" w yerrorbars ls ${ls}, \
+        "kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:13 title "min" w lines ls 10, \
+        "kv-committing-regbench-n-t${concur}-${scale}-combined.data" using 1:14 title "max" w lines ls 11
+	# replot
+EOF
+done
+
+
+if false ;then
+cat <<EOF | tee /dev/null | gnuplot -p
+        $(cat $prologue)
+        $(cat $latency_prologue)
+        set datafile separator " "
+        set xlabel "throttle-size"
+        set ylabel "latency nanoseconds"
+
+	set title "regbench-n binned mean latency concurrency multi"
+	set terminal pdf
+	set output 'combined-latency-multi-${scale}.pdf'
+        plot "kv-committing-regbench-n-t1-${scale}-combined.data" using 1:3:4 title "concurrency 1" w yerrorbars ls 1, \
+             "kv-committing-regbench-n-t2-${scale}-combined.data" using 1:3:4 title "concurrency 2" w yerrorbars ls 2, \
+             "kv-committing-regbench-n-t4-${scale}-combined.data" using 1:3:4 title "concurrency 4" w yerrorbars ls 3, \
+             "kv-committing-regbench-n-t8-${scale}-combined.data" using 1:3:4 title "concurrency 8" w yerrorbars ls 4, \
+             "kv-committing-regbench-n-t16-${scale}-combined.data" using 1:3:4 title "concurrency 16" w yerrorbars ls 5, \
+             "kv-committing-regbench-n-t32-${scale}-combined.data" using 1:3:4 title "concurrency 32" w yerrorbars ls 6, \
+             "kv-committing-regbench-n-t64-${scale}-combined.data" using 1:3:4 title "concurrency 64" w yerrorbars ls 7, \
+             "kv-committing-regbench-n-t128-${scale}-combined.data" using 1:3:4 title "concurrency 128" w yerrorbars ls 8
+	# replot
+EOF
+fi
+
+
+if false ;then
+cat <<EOF | tee /dev/null | gnuplot -p
+        $(cat $prologue)
+        $(cat $throughput_prologue)
+        set datafile separator " "
+        set xlabel "throttle-size"
+        set ylabel "throughput (bytes/sec)"
+
+	set title "regbench-n binned mean throughput concurrency multi"
+	set terminal pdf
+	set output 'combined-throughput-${concur}-${scale}.pdf'
+        plot "kv-committing-regbench-n-t1-${scale}-combined.data" using 1:5:6 title "concurrency 1" w yerrorbars ls 1, \
+             "kv-committing-regbench-n-t2-${scale}-combined.data" using 1:5:6 title "concurrency 2" w yerrorbars ls 2, \
+             "kv-committing-regbench-n-t4-${scale}-combined.data" using 1:5:6 title "concurrency 4" w yerrorbars ls 3, \
+             "kv-committing-regbench-n-t8-${scale}-combined.data" using 1:5:6 title "concurrency 8" w yerrorbars ls 4, \
+             "kv-committing-regbench-n-t16-${scale}-combined.data" using 1:5:6 title "concurrency 16" w yerrorbars ls 5, \
+             "kv-committing-regbench-n-t32-${scale}-combined.data" using 1:5:6 title "concurrency 32" w yerrorbars ls 6, \
+             "kv-committing-regbench-n-t64-${scale}-combined.data" using 1:5:6 title "concurrency 64" w yerrorbars ls 7, \
+             "kv-committing-regbench-n-t128-${scale}-combined.data" using 1:5:6 title "concurrency 128" w yerrorbars ls 8
+	# replot
+EOF
+fi
+
+rm -f $prologue $scalefile $throughput_prologue $latency_prologue
