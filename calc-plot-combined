@@ -3,24 +3,21 @@
 datafiles=$(ls kv-committing-regbench-n-t*.data | grep -v combined)
 singles="no"
 
-if false ; then
-    for scale in 500 1000 1500 2000 5000 10000 25000; do
-	outfiles=""
-	for df in $datafiles ; do
-	    outfile=$(echo $df | sed s/.data/-${scale}-combined.data/)
-	    outfiles="$outfiles $outfile"
-	    combine-data.rb linear $scale $df > $outfile
-	done
-	combine-data.rb linear $scale $datafiles > kv-committing-regbench-n-tmulti-${scale}-combined.data
-    done
+if false ;then
+    scales="500 1000 1500 2000 5000 10000 25000"
+    style="linear"
 else
-    for scale in 0.125 0.25 0.5 1 2 4 8 16 32 ; do
-	outfiles=""
+    scales="0.125 0.25 0.5 1 2 4 8 16 32"
+    scales="0.125 0.25 0.5"
+    style="log"
+fi
+
+for scale in $scales ;do
+    if [ "$singles" == "yes" ] ;then
 	for df in $datafiles ; do
 	    outfile=$(echo $df | sed s/.data/-${scale}-combined.data/)
-	    outfiles="$outfiles $outfile"
-	    combine-data.rb log $scale $df > $outfile
+	    combine-data.rb $style $scale $df > $outfile
 	done
-	combine-data.rb log $scale $datafiles > kv-committing-regbench-n-tmulti-${scale}-combined.data
-    done
-fi
+    fi
+    combine-data.rb $style $scale $datafiles > kv-committing-regbench-n-tmulti-${scale}-combined.data
+done

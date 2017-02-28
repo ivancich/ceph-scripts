@@ -1,0 +1,27 @@
+#!/bin/bash
+
+prologue=/tmp/plot-prologue.$$
+
+cat >$prologue <<EOF
+        set style line 1 pt 1 ps 1 lc "#66c2a5"
+        set style line 2 pt 1 ps 1 lc "#fc8d62"
+        set style line 3 pt 1 ps 1 lc "#8da0cb"
+        set style line 4 pt 1 ps 1 lc "#e78ac3"
+        set style line 5 pt 1 ps 1 lc "#a6d854"
+        set style line 6 pt 1 ps 1 lc "#ffd92f"
+        set style line 7 pt 1 ps 1 lc "#e5c494"
+        set style line 8 pt 1 ps 1 lc "#b3b3b3"
+        set style line 9 pt 1 ps 1 lc "#ffbbbb" lw 1
+        set style line 10 pt 1 ps 1 lc "#bbffbb" lw 1
+        set style line 11 pt 1 ps 1 lc "#bbbbff" lw 1
+EOF
+
+cat <<EOF | tee foobar | gnuplot -p
+    $(cat $prologue)
+    set logscale x 2
+    plot "rb-lat-t4096.data" title "throttle 4096" w lines ls 1 lw 2, \
+         "rb-lat-t8192.data" title "throttle 8192" w lines ls 2 lw 2, \
+         "rb-lat-t16384.data" title "throttle 16384" w lines ls 3 lw 2
+EOF
+
+rm -f $prologue # $scalefile $throughput_prologue $latency_prologue

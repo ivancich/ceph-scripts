@@ -1,0 +1,12 @@
+#!/bin/sh
+
+for t in 4096 8192 16384 ; do
+    file="rb-lat-t${t}.data"
+    echo "# throttle $t" > $file
+    for c in 1 2 4 8 16 32 64 128 ; do
+	dataf="throttle-${t}/regbench-summary-t${t}-o-c${c}.txt"
+	avg_lat=$(grep 'Average Latency' $dataf | sed 's/.* //')
+	stddev_lat=$(grep 'Stddev Latency' $dataf | sed 's/.* //')
+	echo "$c $avg_lat $stddev_lat" >> $file
+    done
+done
