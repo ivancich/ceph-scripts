@@ -1,19 +1,33 @@
 #!/bin/sh
 
-block_size=4096
+# 4096 5793
+# 8192 11585
+# 16384 23170
+# 32768 46341
+# 65536 92682
+# 131072 185364
+# 262144 370728
+# 524288 741455
+# 1048576
+throttle=16384
+
+
+block_size=16384
 run_time=300
-# x4096 5793 x8192 x11585 x16384 23170 32768 46341 65536 _ 131072 _ 262144 _ 524288 1048576
-throttle=46341
+
+sed -i --follow-symlinks "s,\(^[ \t]*bluestore_queue_max_bytes[ \t]*=[ \t]*\).*,\1${throttle}," ceph.conf
+
 
 last_summary() {
   ls -tr regbench-summary* | tail -n 1
 }
 
+blocksize_dir="block-${block_size}"
 throttle_dir="throttle-${throttle}"
+dir=${blocksize_dir}/${throttle_dir}
 
-mkdir $throttle_dir
+mkdir -p $dir
 for concurrent in 1 2 4 8 16 32 64 128 ;do
     run-regular-bench -b=${block_size} -c=${concurrent} -t=${run_time}
-    mv $(last_summary) ${throttle_dir}/regbench-summary-t${throttle}-o-c${concurrent}.txt
-    # gen-kv-committing-data "regbench-o-c${concurrent}-t${throttle}"
+    mv $(last_summary) ${dir}/regbench-summary-t${throttle}-o-c${concurrent}.txt
 done
