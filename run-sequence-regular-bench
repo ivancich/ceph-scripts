@@ -9,11 +9,44 @@
 # 262144 370728
 # 524288 741455
 # 1048576
-throttle=16384
 
+# throttle=4096
+# block_size=16384
 
-block_size=16384
 run_time=300
+
+error=0
+
+for i in "$@" ;do
+    case $i in
+        --blocksize=*)
+            block_size="${i#*=}"
+            shift
+            ;;
+        --throttle=*)
+            throttle="${i#*=}"
+            shift
+            ;;
+        --time=*)
+            run_time="${i#*=}"
+            shift
+            ;;
+        *)
+            echo "Unknown argument $i"
+            error=1
+            ;;
+    esac
+done
+
+if [ $error -gt 0 ] ;then
+    exit 1
+fi
+
+if [ -z "$throttle" -o -z "$blocksize" ] ;then
+    echo "error: must provide both --throttle and --blocksize"
+    exit 2
+fi
+
 
 sed -i --follow-symlinks "s,\(^[ \t]*bluestore_queue_max_bytes[ \t]*=[ \t]*\).*,\1${throttle}," ceph.conf
 
