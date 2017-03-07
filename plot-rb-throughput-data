@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [ $# -ne 1 ] ;then
+    echo "usage: $(basename $0) <write-size-label>"
+    exit 1
+fi
+write_size="$1"
+
+prologue=/tmp/plot-prologue.$$
+zoom=/tmp/plot-zoom.$$
+
+cat >$prologue <<EOF
+        set style line 1 pt 1 ps 1 lc "#66c2a5" lw 2
+        set style line 2 pt 1 ps 1 lc "#fc8d62" lw 2
+        set style line 3 pt 1 ps 1 lc "#8da0cb" lw 2
+        set style line 4 pt 1 ps 1 lc "#e78ac3" lw 2
+        set style line 5 pt 1 ps 1 lc "#a6d854" lw 2
+        set style line 6 pt 1 ps 1 lc "#ffd92f" lw 2
+        set style line 7 pt 1 ps 1 lc "#e5c494" lw 2
+        set style line 8 pt 1 ps 1 lc "#b3b3b3" lw 2
+        set style line 9 pt 1 ps 1 lc "#ffbbbb" lw 1
+        set style line 10 pt 1 ps 1 lc "#bbffbb" lw 1
+        set style line 11 pt 1 ps 1 lc "#bbbbff" lw 1
+EOF
+
+title="Throughput, ${write_size} Writes"
+fname="throttle-tests-throughput-${write_size}-writes"
+
+cat >$zoom <<EOF
+    set xrange [:16]
+    set yrange [:2.5]
+    set title "$title, Zoomed"
+EOF
+
+
+cat <<EOF | tee .plotfile | gnuplot -p
+    set title "$title"
+    $(cat $prologue)
+    set logscale x 2
+    set xlabel "concurrency"
+    set ylabel "throughput (MB/sec)"
+    plot "rb-thru-t4096.data" title "throttle 4096" w lines ls 1, \
+         "rb-thru-t8192.data" title "throttle 8192" w lines ls 2, \
+         "rb-thru-t16384.data" title "throttle 16384" w lines ls 3, \
+         "rb-thru-t32768.data" title "throttle 32768" w lines ls 4, \
+         "rb-thru-t65536.data" title "throttle 65536" w lines ls 5, \
+         "rb-thru-t131072.data" title "throttle 131072" w lines ls 6, \
+         "rb-thru-t262144.data" title "throttle 262144" w lines ls 7, \
+         "rb-thru-t524288.data" title "throttle 524288" w lines ls 8
+    set terminal pdf
+    set output '${fname}.pdf'
+    replot
+EOF
+
+rm -f $prologue $zoom

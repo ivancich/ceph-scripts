@@ -42,7 +42,7 @@ if [ $error -gt 0 ] ;then
     exit 1
 fi
 
-if [ -z "$throttle" -o -z "$blocksize" ] ;then
+if [ -z "$throttle" -o -z "$block_size" ] ;then
     echo "error: must provide both --throttle and --blocksize"
     exit 2
 fi
