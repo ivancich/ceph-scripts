@@ -1,6 +1,7 @@
 #!/bin/bash
 
 prologue=/tmp/plot-prologue.$$
+zoom=/tmp/plot-zoom.$$
 
 cat >$prologue <<EOF
         set style line 1 pt 1 ps 1 lc "#66c2a5" lw 2
@@ -16,20 +17,30 @@ cat >$prologue <<EOF
         set style line 11 pt 1 ps 1 lc "#bbbbff" lw 1
 EOF
 
+title="4K Writes"
+
+cat >$zoom <<EOF
+    set xrange [:16]
+    set yrange [:2.5]
+    set title "$title Zoomed"
+EOF
+
+
 cat <<EOF | tee foobar | gnuplot -p
+    set title "$title"
     $(cat $prologue)
+    $(cat $zoom)
     set logscale x 2
     set xlabel "concurrency"
     set ylabel "latency (seconds)"
-    # set yrange [:5]
-    # set title "Zoomed"
     plot "rb-lat-t4096.data" title "throttle 4096" w lines ls 1, \
          "rb-lat-t8192.data" title "throttle 8192" w lines ls 2, \
          "rb-lat-t16384.data" title "throttle 16384" w lines ls 3, \
          "rb-lat-t32768.data" title "throttle 32768" w lines ls 4, \
          "rb-lat-t65536.data" title "throttle 65536" w lines ls 5, \
          "rb-lat-t131072.data" title "throttle 131072" w lines ls 6, \
-         "rb-lat-t262144.data" title "throttle 262144" w lines ls 7
+         "rb-lat-t262144.data" title "throttle 262144" w lines ls 7, \
+         "rb-lat-t524288.data" title "throttle 524288" w lines ls 8
 EOF
 
-rm -f $prologue # $scalefile $throughput_prologue $latency_prologue
+rm -f $prologue $zoom
